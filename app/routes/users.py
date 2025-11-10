@@ -125,9 +125,10 @@ def create_user(validated_data: UserCreateSchema):
 
     # Log activity
     current_user_id = get_jwt_identity()
+    # JWT identity is string, convert to int for database
     activity = ActivityLog(
         event_type='user_created',
-        user_id=current_user_id,
+        user_id=int(current_user_id),
         description=f'Created user: {user.email}',
         ip_address=request.remote_addr
     )
@@ -222,7 +223,7 @@ def update_user(user_id, validated_data: UserUpdateSchema):
     current_user_id = get_jwt_identity()
     activity = ActivityLog(
         event_type='user_updated',
-        user_id=current_user_id,
+        user_id=int(current_user_id),
         description=f'Updated user: {user.email}',
         ip_address=request.remote_addr
     )
@@ -254,13 +255,20 @@ def delete_user(user_id):
 
     # Prevent deleting yourself
     current_user_id = get_jwt_identity()
-    if user_id == current_user_id:
+    # JWT identity is string, convert to int for comparison
+    if user_id == int(current_user_id):
         return jsonify({
             'error': {
                 'code': 'CANNOT_DELETE_SELF',
                 'message': 'You cannot delete your own account'
             }
         }), 400
+
+    # Handle activity logs before deletion (set user_id to NULL to preserve audit trail)
+    activity_count = ActivityLog.query.filter_by(user_id=user_id).count()
+    if activity_count > 0:
+        ActivityLog.query.filter_by(user_id=user_id).update({'user_id': None})
+        db.session.commit()
 
     email = user.email
     db.session.delete(user)
@@ -269,7 +277,7 @@ def delete_user(user_id):
     # Log activity
     activity = ActivityLog(
         event_type='user_deleted',
-        user_id=current_user_id,
+        user_id=int(current_user_id),
         description=f'Deleted user: {email}',
         ip_address=request.remote_addr
     )

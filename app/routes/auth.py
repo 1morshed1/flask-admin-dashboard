@@ -42,12 +42,12 @@ def login(validated_data: LoginSchema):
     user.last_login = datetime.utcnow()
     db.session.commit()
 
-    # Create tokens
+    # Create tokens (identity must be string)
     access_token = create_access_token(
-        identity=user.id,
+        identity=str(user.id),
         additional_claims={'role': user.role}
     )
-    refresh_token = create_refresh_token(identity=user.id)
+    refresh_token = create_refresh_token(identity=str(user.id))
 
     # Log activity
     activity = ActivityLog(
@@ -73,10 +73,11 @@ def login(validated_data: LoginSchema):
 def refresh():
     """Refresh access token"""
     identity = get_jwt_identity()
-    user = User.query.get(identity)
+    # Identity comes as string from JWT, convert to int for query
+    user = User.query.get(int(identity))
     if user:
         access_token = create_access_token(
-            identity=identity,
+            identity=str(user.id),
             additional_claims={'role': user.role}
         )
     else:
@@ -91,7 +92,8 @@ def refresh():
 def logout():
     """User logout endpoint"""
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    # JWT identity is string, convert to int for database query
+    user = User.query.get(int(user_id))
     if user:
         # Log activity
         activity = ActivityLog(
@@ -113,7 +115,8 @@ def logout():
 def get_current_user():
     """Get current authenticated user"""
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    # JWT identity is string, convert to int for database query
+    user = User.query.get(int(user_id))
     if not user:
         return jsonify({
             'error': {

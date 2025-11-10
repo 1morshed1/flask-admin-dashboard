@@ -100,9 +100,10 @@ def create_application(validated_data: ApplicationCreateSchema):
 
     # Log activity
     current_user_id = get_jwt_identity()
+    # JWT identity is string, convert to int for database
     activity = ActivityLog(
         event_type='application_created',
-        user_id=current_user_id,
+        user_id=int(current_user_id),
         description=f'Created application: {application.name}',
         ip_address=request.remote_addr
     )
@@ -180,7 +181,7 @@ def update_application(app_id, validated_data: ApplicationUpdateSchema):
     current_user_id = get_jwt_identity()
     activity = ActivityLog(
         event_type='application_updated',
-        user_id=current_user_id,
+        user_id=int(current_user_id),
         description=f'Updated application: {application.name}',
         ip_address=request.remote_addr
     )
@@ -218,7 +219,7 @@ def delete_application(app_id):
     current_user_id = get_jwt_identity()
     activity = ActivityLog(
         event_type='application_deleted',
-        user_id=current_user_id,
+        user_id=int(current_user_id),
         description=f'Deleted application: {name}',
         ip_address=request.remote_addr
     )

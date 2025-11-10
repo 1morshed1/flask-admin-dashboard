@@ -35,18 +35,28 @@ def validate_request(schema: Type[BaseModel], source: str = 'json'):
                 kwargs['validated_data'] = validated_data
                 return f(*args, **kwargs)
             except ValidationError as e:
+                # Convert Pydantic errors to JSON-serializable format
+                error_details = []
+                for error in e.errors():
+                    error_details.append({
+                        'field': error.get('loc', []),
+                        'message': str(error.get('msg', '')),
+                        'type': str(error.get('type', ''))
+                    })
                 return jsonify({
                     'error': {
                         'code': 'VALIDATION_ERROR',
                         'message': 'Invalid input data',
-                        'details': e.errors()
+                        'details': error_details
                     }
                 }), 400
             except Exception as e:
+                # Ensure error message is JSON-serializable
+                error_message = str(e) if e else 'An unexpected error occurred'
                 return jsonify({
                     'error': {
                         'code': 'INTERNAL_ERROR',
-                        'message': str(e)
+                        'message': error_message
                     }
                 }), 500
         return decorated_function
