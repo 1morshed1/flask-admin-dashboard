@@ -1,0 +1,44 @@
+name: Build Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Get short commit hash
+        id: commit
+        run: echo "SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: |
+            flask-admin-dashboard:${{ steps.commit.outputs.SHORT_SHA }}
+            flask-admin-dashboard:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Image metadata
+        run: |
+          echo "Image built successfully!"
+          echo "Image tag: flask-admin-dashboard:${{ steps.commit.outputs.SHORT_SHA }}"
+          echo "Commit SHA: ${{ github.sha }}"
+          echo "Short SHA: ${{ steps.commit.outputs.SHORT_SHA }}"
+
