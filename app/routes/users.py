@@ -288,3 +288,19 @@ def delete_user(user_id):
         'message': 'User deleted successfully'
     }), 200
 
+
+@users_bp.route('/roles', methods=['GET'])
+@jwt_required()
+def get_roles():
+    """Get all available user roles"""
+    error = require_admin()
+    if error:
+        return error
+    
+    return jsonify({
+        'roles': [
+            {'value': 'user', 'label': 'User'},
+            {'value': 'admin', 'label': 'Admin'},
+            {'value': 'superadmin', 'label': 'Super Admin'}
+        ]
+    }), 200

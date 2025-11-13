@@ -251,6 +251,20 @@
 					"response": []
 				},
 				{
+					"name": "Get All Roles",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/roles",
+							"host": ["{{base_url}}"],
+							"path": ["users", "roles"]
+						},
+						"description": "Get all available user roles. Requires admin/superadmin role."
+					},
+					"response": []
+				},
+				{
 					"name": "Delete User",
 					"request": {
 						"method": "DELETE",
@@ -574,4 +588,3 @@
 		]
 	}
 }
-

@@ -611,6 +611,32 @@ GET /api/users?page=1&per_page=10&role=admin&status=active&search=john
   }
   ```
 
+#### Get All Roles
+- **Method:** `GET`
+- **URL:** `/api/users/roles`
+- **Auth:** Access token (admin/superadmin only)
+- **Body:** None
+
+**Response:**
+```json
+{
+  "roles": [
+    {
+      "value": "user",
+      "label": "User"
+    },
+    {
+      "value": "admin",
+      "label": "Admin"
+    },
+    {
+      "value": "superadmin",
+      "label": "Super Admin"
+    }
+  ]
+}
+```
+
 #### Delete User
 - **Method:** `DELETE`
 - **URL:** `/api/users/<user_id>`
@@ -1197,4 +1223,3 @@ This project is provided as-is for educational and development purposes.
 
 **Last Updated:** 2024-01-15
 **Version:** 1.0.0
-

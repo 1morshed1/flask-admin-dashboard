@@ -219,6 +219,44 @@ if (pm.response.code === 201) {
 - URL: `{{base_url}}/users/{{user_id}}`
 - Folder: **Users**
 
+#### Get All Roles
+
+**Request:**
+- Method: `GET`
+- URL: `{{base_url}}/users/roles`
+- Folder: **Users**
+
+**Description:** Get all available user roles for dropdowns and filters
+
+**Expected Response:**
+```json
+{
+  "roles": [
+    {
+      "value": "user",
+      "label": "User"
+    },
+    {
+      "value": "admin",
+      "label": "Admin"
+    },
+    {
+      "value": "superadmin",
+      "label": "Super Admin"
+    }
+  ]
+}
+```
+
+**Tests Tab:**
+```javascript
+if (pm.response.code === 200) {
+    const response = pm.response.json();
+    console.log("Available roles:", response.roles.length);
+    pm.collectionVariables.set("available_roles", JSON.stringify(response.roles));
+}
+```
+
 #### Update User
 
 **Request:**
@@ -566,4 +604,3 @@ Authorization: Bearer {{access_token}}
 ---
 
 **Happy Testing! 🚀**
-
