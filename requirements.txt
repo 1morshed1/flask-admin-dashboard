@@ -18,6 +18,9 @@ email-validator==2.1.0
 # Password Hashing
 bcrypt==4.1.2
 
+# SAML SSO
+python3-saml==1.16.0
+
 # System Monitoring
 psutil==5.9.6
 

@@ -1,3 +1,5 @@
+# app/middleware/activity_logger.py
+
 from flask import request, g
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from functools import wraps

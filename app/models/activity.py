@@ -1,3 +1,5 @@
+# app/models/activity.py
+
 from app import db
 from datetime import datetime
 

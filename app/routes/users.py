@@ -1,3 +1,5 @@
+# app/routes/users.py
+
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from sqlalchemy import or_
@@ -6,7 +8,8 @@ from app.models import User, Application, ActivityLog
 from app.schemas.user_schema import (
     UserCreateSchema,
     UserUpdateSchema,
-    UserQuerySchema
+    UserQuerySchema,
+    SSOUserCreateSchema
 )
 from app.utils.validation import validate_json_body, validate_query_params
 
@@ -87,12 +90,31 @@ def get_users(validated_data: UserQuerySchema):
 
 @users_bp.route('', methods=['POST'])
 @jwt_required()
-@validate_json_body(UserCreateSchema)
-def create_user(validated_data: UserCreateSchema):
-    """Create a new user"""
+def create_user():
+    """Create a new user (supports both regular and SSO users)"""
     error = require_admin()
     if error:
         return error
+
+    data = request.get_json()
+    
+    # Check if this is an SSO user
+    is_sso = data.get('is_sso_user', False)
+    
+    try:
+        if is_sso:
+            # Validate as SSO user (no password required)
+            validated_data = SSOUserCreateSchema(**data)
+        else:
+            # Validate as regular user (password required)
+            validated_data = UserCreateSchema(**data)
+    except Exception as e:
+        return jsonify({
+            'error': {
+                'code': 'VALIDATION_ERROR',
+                'message': str(e)
+            }
+        }), 400
 
     # Check if email already exists
     if User.query.filter_by(email=validated_data.email).first():
@@ -109,9 +131,13 @@ def create_user(validated_data: UserCreateSchema):
         role=validated_data.role,
         status=validated_data.status,
         first_name=validated_data.first_name,
-        last_name=validated_data.last_name
+        last_name=validated_data.last_name,
+        is_sso_user=is_sso
     )
-    user.set_password(validated_data.password)
+    
+    # Only set password for non-SSO users
+    if not is_sso and hasattr(validated_data, 'password'):
+        user.set_password(validated_data.password)
 
     # Assign applications
     if validated_data.application_ids:
@@ -125,11 +151,10 @@ def create_user(validated_data: UserCreateSchema):
 
     # Log activity
     current_user_id = get_jwt_identity()
-    # JWT identity is string, convert to int for database
     activity = ActivityLog(
         event_type='user_created',
         user_id=int(current_user_id),
-        description=f'Created user: {user.email}',
+        description=f'Created {"SSO " if is_sso else ""}user: {user.email}',
         ip_address=request.remote_addr
     )
     db.session.add(activity)
@@ -196,6 +221,14 @@ def update_user(user_id, validated_data: UserUpdateSchema):
         user.email = validated_data.email
 
     if validated_data.password:
+        # Prevent setting password for SSO users
+        if user.is_sso_user:
+            return jsonify({
+                'error': {
+                    'code': 'INVALID_OPERATION',
+                    'message': 'Cannot set password for SSO users. SSO users authenticate via Identity Provider.'
+                }
+            }), 400
         user.set_password(validated_data.password)
 
     if validated_data.role:

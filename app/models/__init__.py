@@ -1,3 +1,5 @@
+# app/models/__init__.py
+
 from app.models.user import User, user_applications
 from app.models.application import Application
 from app.models.activity import ActivityLog

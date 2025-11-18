@@ -1,3 +1,5 @@
+# app/schemas/user_schema.py
+
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from typing import Optional, List, Literal
 from datetime import datetime
@@ -26,6 +28,17 @@ class UserCreateSchema(BaseModel):
         if len(v) < 6:
             raise ValueError('Password must be at least 6 characters')
         return v
+
+
+class SSOUserCreateSchema(BaseModel):
+    """SSO user creation schema (no password required)"""
+    email: EmailStr
+    role: Literal['user', 'admin', 'superadmin'] = 'user'
+    status: Literal['active', 'inactive'] = 'active'
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    application_ids: List[int] = Field(default_factory=list)
+    is_sso_user: bool = True
 
 
 class UserUpdateSchema(BaseModel):
@@ -71,6 +84,7 @@ class UserResponseSchema(BaseModel):
     status: str
     first_name: Optional[str]
     last_name: Optional[str]
+    is_sso_user: bool
     created_date: Optional[datetime]
     last_login: Optional[datetime]
     assigned_applications: List[dict]

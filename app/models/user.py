@@ -1,3 +1,5 @@
+# app/models/user.py
+
 from app import db
 from datetime import datetime
 import bcrypt
@@ -6,7 +8,7 @@ class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(255), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=True)  # Nullable for SSO users
     role = db.Column(
         db.String(20),
         nullable=False,
@@ -20,6 +22,8 @@ class User(db.Model):
     # Profile
     first_name = db.Column(db.String(50))
     last_name = db.Column(db.String(50))
+    # SSO support
+    is_sso_user = db.Column(db.Boolean, default=False, nullable=False)
     # Timestamps
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
@@ -38,13 +42,17 @@ class User(db.Model):
 
     def set_password(self, password):
         """Hash and set password"""
-        self.password_hash = bcrypt.hashpw(
-            password.encode('utf-8'),
-            bcrypt.gensalt()
-        ).decode('utf-8')
+        if password:  # Only set if password provided
+            self.password_hash = bcrypt.hashpw(
+                password.encode('utf-8'),
+                bcrypt.gensalt()
+            ).decode('utf-8')
 
     def check_password(self, password):
         """Verify password"""
+        # SSO users can't use password login
+        if self.is_sso_user or not self.password_hash:
+            return False
         return bcrypt.checkpw(
             password.encode('utf-8'),
             self.password_hash.encode('utf-8')
@@ -59,6 +67,7 @@ class User(db.Model):
             'status': self.status,
             'first_name': self.first_name,
             'last_name': self.last_name,
+            'is_sso_user': self.is_sso_user,
             'created_date': self.created_date.isoformat() if self.created_date else None,
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'assigned_applications': [app.to_dict() for app in self.assigned_applications]

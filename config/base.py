@@ -1,3 +1,5 @@
+# config/base.py
+
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
@@ -25,6 +27,24 @@ class Config:
     CORS_HEADERS = 'Content-Type'
     # Pagination
     ITEMS_PER_PAGE = 20
+    
+    # Frontend URL for SSO redirects
+    FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+    
+    # SAML Configuration
+    SAML_ENABLED = os.environ.get('SAML_ENABLED', 'False').lower() == 'true'
+    SAML_SP_BASE_URL = os.environ.get('SAML_SP_BASE_URL', 'http://localhost:5000')
+    SAML_IDP_ENTITY_ID = os.environ.get('SAML_IDP_ENTITY_ID', '')
+    SAML_IDP_SSO_URL = os.environ.get('SAML_IDP_SSO_URL', '')
+    SAML_IDP_SLO_URL = os.environ.get('SAML_IDP_SLO_URL', '')
+    SAML_IDP_X509_CERT = os.environ.get('SAML_IDP_X509_CERT', '')
+    SAML_DEBUG = os.environ.get('SAML_DEBUG', 'True').lower() == 'true'
+    # Security settings (defaults match settings.json example: wantAssertionsSigned=True)
+    SAML_WANT_ASSERTIONS_SIGNED = os.environ.get('SAML_WANT_ASSERTIONS_SIGNED', 'True').lower() == 'true'
+    SAML_WANT_MESSAGES_SIGNED = os.environ.get('SAML_WANT_MESSAGES_SIGNED', 'False').lower() == 'true'
+    SAML_AUTHN_REQUESTS_SIGNED = os.environ.get('SAML_AUTHN_REQUESTS_SIGNED', 'False').lower() == 'true'
+    # Default role for auto-provisioned SSO users
+    SAML_DEFAULT_ROLE = os.environ.get('SAML_DEFAULT_ROLE', 'user')
 
 class DevelopmentConfig(Config):
 
@@ -35,6 +55,8 @@ class ProductionConfig(Config):
 
     """Production configuration"""
     DEBUG = False
+    # In production, set SAML strict mode
+    SAML_STRICT = True
 
 config = {
     'development': DevelopmentConfig,

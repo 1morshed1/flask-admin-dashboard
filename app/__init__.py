@@ -1,3 +1,4 @@
+# app/__init__.py
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -10,11 +11,10 @@ db = SQLAlchemy()
 migrate = Migrate()
 jwt = JWTManager()
 
-
 def create_app(config_object=None):
     """Application factory"""
     app = Flask(__name__)
-
+    
     # Load configuration
     if config_object:
         app.config.from_object(config_object)
@@ -23,32 +23,45 @@ def create_app(config_object=None):
         # Flask 3.0 uses FLASK_ENV, fallback to 'development'
         env = os.environ.get('FLASK_ENV', 'development')
         app.config.from_object(config.get(env, config['default']))
-
+    
     # Initialize extensions
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
-    CORS(app)
-
+    
+    # Configure CORS for Next.js frontend
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                # Add production URL when deployed
+                # "https://yourdomain.com"
+            ],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True
+        }
+    })
+    
     # Register error handlers
     from app.utils.error_handler import register_error_handlers
     register_error_handlers(app)
-
+    
     # Register blueprints
     from app.routes.auth import auth_bp
     from app.routes.users import users_bp
     from app.routes.applications import applications_bp
     from app.routes.dashboard import dashboard_bp
-
+    
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(applications_bp)
     app.register_blueprint(dashboard_bp)
-
+    
     # Start background metrics collector (optional)
     # from app.utils.background_tasks import MetricsCollector
     # collector = MetricsCollector(app, interval=300)
     # collector.start()
-
+    
     return app
-
