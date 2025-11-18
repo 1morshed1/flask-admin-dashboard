@@ -6,6 +6,7 @@ on:
       - main
       - all_roles_api
       - verify_token_api
+      - merge-verify-token-api-and-okta
       
 
 jobs:
