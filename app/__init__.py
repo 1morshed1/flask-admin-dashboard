@@ -1,4 +1,6 @@
 import os
+import logging
+from logging.handlers import RotatingFileHandler
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -29,6 +31,24 @@ def create_app(config_object=None):
     migrate.init_app(app, db)
     jwt.init_app(app)
     CORS(app)
+
+    # Configure logging
+    if not app.debug:
+        # In production, log to file
+        if not os.path.exists('logs'):
+            os.mkdir('logs')
+        file_handler = RotatingFileHandler('logs/flask-admin-dashboard.log', maxBytes=10240000, backupCount=10)
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+        ))
+        file_handler.setLevel(logging.INFO)
+        app.logger.addHandler(file_handler)
+        app.logger.setLevel(logging.INFO)
+        app.logger.info('Flask Admin Dashboard startup')
+    else:
+        # In development, log to console
+        logging.basicConfig(level=logging.INFO)
+        app.logger.setLevel(logging.INFO)
 
     # Register error handlers
     from app.utils.error_handler import register_error_handlers

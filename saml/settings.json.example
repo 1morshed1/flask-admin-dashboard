@@ -1,0 +1,36 @@
+{
+  "strict": false,
+  "debug": true,
+  "sp": {
+    "entityId": "https://your-domain.com/api/auth/metadata/",
+    "assertionConsumerService": {
+      "url": "https://your-domain.com/api/auth/sso/acs",
+      "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+    }
+  },
+  "idp": {
+    "entityId": "http://www.okta.com/YOUR_OKTA_APP_ID",
+    "singleSignOnService": {
+      "url": "https://your-okta-domain.okta.com/app/YOUR_APP_NAME/YOUR_APP_ID/sso/saml",
+      "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+    },
+    "x509cert": "YOUR_OKTA_X509_CERTIFICATE_HERE"
+  },
+  "security": {
+    "nameIdEncrypted": false,
+    "authnRequestsSigned": false,
+    "logoutRequestsSigned": false,
+    "logoutResponsesSigned": false,
+    "signMetadata": false,
+    "wantAssertionsSigned": false,
+    "wantMessagesSigned": false,
+    "wantNameId": true,
+    "wantNameIdEncrypted": false,
+    "wantAssertionsEncrypted": false,
+    "allowRepeatAttributeName": false,
+    "rejectUnsolicitedResponsesWithInResponseTo": false,
+    "signatureAlgorithm": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+    "digestAlgorithm": "http://www.w3.org/2001/04/xmlenc#sha256"
+  }
+}
+
