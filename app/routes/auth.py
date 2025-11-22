@@ -371,7 +371,7 @@ def sso_acs():
             frontend_uri = os.getenv("FRONTEND_URL", "http://localhost:3000")
             logger.info(f"Frontend URL from environment: {frontend_uri}")
             
-            redirect_uri = f"{frontend_uri}/sso-callback-error?message=User not Found"
+            redirect_uri = f"{frontend_uri}/admin/sso-callback-error?message=User not Found"
             logger.info("RESULT: Redirect URL constructed")
             logger.info(f"Full redirect URL: {redirect_uri}")
             return redirect(redirect_uri)
@@ -401,7 +401,7 @@ def sso_acs():
             frontend_uri2 = os.getenv("FRONTEND_URL", "http://localhost:3000")
             logger.info(f"Frontend URL from environment: {frontend_uri2}")
             
-            redirect_uri2 = f"{frontend_uri2}/sso-callback-error?message=User '{email}' Not found in the system"
+            redirect_uri2 = f"{frontend_uri2}/admin/sso-callback-error?message=User '{email}' Not found in the system"
             logger.info("RESULT: Redirect URL constructed")
             logger.info(f"Full redirect URL: {redirect_uri2}")
             return redirect(redirect_uri2)
@@ -437,7 +437,7 @@ def sso_acs():
             logger.info(f"Token length: {len(access_token)} characters")
             logger.info(f"JWT token created successfully for: {email}")
             
-            redirect_url = f"{frontend_url}/sso-callback?token={access_token}"
+            redirect_url = f"{frontend_url}/admin/sso-callback?token={access_token}"
             logger.info("RESULT: Redirect URL constructed")
             logger.info(f"Full redirect URL: {redirect_url}")
             
