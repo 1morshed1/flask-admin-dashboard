@@ -654,8 +654,17 @@ def verify_token():
             if exp:
                 expires_at = datetime.fromtimestamp(exp).isoformat()
             
+            # Create new access and refresh tokens
+            access_token = create_access_token(
+                identity=str(user.id),
+                additional_claims={'role': user.role}
+            )
+            refresh_token = create_refresh_token(identity=str(user.id))
+            
             return jsonify({
                 'valid': True,
+                'access_token': access_token,
+                'refresh_token': refresh_token,
                 'token_info': {
                     'user_id': user_id,
                     'role': role,
