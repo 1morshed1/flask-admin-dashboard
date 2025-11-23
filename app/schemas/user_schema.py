@@ -18,11 +18,23 @@ class UserCreateSchema(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     application_ids: List[str] = Field(default_factory=list, description="List of application IDs (strings)")
+    file_category_ids: List[str] = Field(default_factory=list, description="List of file category IDs (strings)")
     
     @field_validator('application_ids', mode='before')
     @classmethod
     def validate_application_ids(cls, v):
         """Ensure application_ids are strings, not integers"""
+        if v is None:
+            return []
+        if isinstance(v, list):
+            # Convert all items to strings explicitly
+            return [str(item) for item in v]
+        return v
+
+    @field_validator('file_category_ids', mode='before')
+    @classmethod
+    def validate_file_category_ids(cls, v):
+        """Ensure file_category_ids are strings, not integers"""
         if v is None:
             return []
         if isinstance(v, list):
@@ -48,6 +60,7 @@ class UserUpdateSchema(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     application_ids: Optional[List[str]] = None
+    file_category_ids: Optional[List[str]] = None
     
     @field_validator('application_ids', mode='before')
     @classmethod
@@ -60,12 +73,23 @@ class UserUpdateSchema(BaseModel):
             return [str(item) for item in v]
         return v
 
+    @field_validator('file_category_ids', mode='before')
+    @classmethod
+    def validate_file_category_ids(cls, v):
+        """Ensure file_category_ids are strings, not integers"""
+        if v is None:
+            return None
+        if isinstance(v, list):
+            # Convert all items to strings explicitly
+            return [str(item) for item in v]
+        return v
+
     @model_validator(mode='after')
     def check_at_least_one_field(self):
         """Ensure at least one field is provided"""
         if not any([
             self.email, self.password, self.role, self.status,
-            self.first_name, self.last_name, self.application_ids
+            self.first_name, self.last_name, self.application_ids, self.file_category_ids
         ]):
             raise ValueError('At least one field must be provided for update')
         return self
@@ -96,6 +120,7 @@ class UserResponseSchema(BaseModel):
     created_date: Optional[datetime]
     last_login: Optional[datetime]
     assigned_applications: List[dict]
+    assigned_file_categories: Optional[List[dict]] = None
     model_config = {
         'from_attributes': True  # Allow ORM models
     }

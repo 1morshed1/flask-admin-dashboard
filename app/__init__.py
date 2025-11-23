@@ -57,11 +57,13 @@ def create_app(config_object=None):
     from app.routes.users import users_bp
     from app.routes.applications import applications_bp
     from app.routes.dashboard import dashboard_bp
+    from app.routes.file_categories import file_categories_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(applications_bp)
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(file_categories_bp)
 
     # Start background metrics collector (optional)
     # from app.utils.background_tasks import MetricsCollector

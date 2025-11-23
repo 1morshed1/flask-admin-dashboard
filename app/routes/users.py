@@ -7,6 +7,7 @@ from app.schemas.user_schema import (
     UserUpdateSchema,
     UserQuerySchema
 )
+from app.models import FileCategory
 from app.utils.validation import validate_json_body, validate_query_params
 
 users_bp = Blueprint('users', __name__, url_prefix='/api/users')
@@ -124,6 +125,23 @@ def create_user(validated_data: UserCreateSchema):
             }
         }), 409
 
+    # Validate file category IDs exist in database
+    if validated_data.file_category_ids:
+        invalid_ids = []
+        for category_id in validated_data.file_category_ids:
+            category = FileCategory.get_by_id(category_id)
+            if not category:
+                invalid_ids.append(category_id)
+            elif hasattr(category, 'status') and category.status != 'active':
+                invalid_ids.append(category_id)
+        if invalid_ids:
+            return jsonify({
+                'error': {
+                    'code': 'INVALID_FILE_CATEGORY_IDS',
+                    'message': f'Invalid or inactive file category IDs: {invalid_ids}. Please use valid active category IDs.'
+                }
+            }), 400
+
     # Create user
     user = User(
         email=validated_data.email,
@@ -137,6 +155,10 @@ def create_user(validated_data: UserCreateSchema):
     # Assign applications
     if validated_data.application_ids:
         user.assigned_application_ids = validated_data.application_ids
+
+    # Assign file categories
+    if validated_data.file_category_ids:
+        user.assigned_file_category_ids = validated_data.file_category_ids
 
     user.save()
 
@@ -225,6 +247,25 @@ def update_user(user_id, validated_data: UserUpdateSchema):
     if validated_data.application_ids is not None:
         user.assigned_application_ids = validated_data.application_ids
 
+    # Update file categories
+    if validated_data.file_category_ids is not None:
+        # Validate file category IDs exist in database
+        invalid_ids = []
+        for category_id in validated_data.file_category_ids:
+            category = FileCategory.get_by_id(category_id)
+            if not category:
+                invalid_ids.append(category_id)
+            elif hasattr(category, 'status') and category.status != 'active':
+                invalid_ids.append(category_id)
+        if invalid_ids:
+            return jsonify({
+                'error': {
+                    'code': 'INVALID_FILE_CATEGORY_IDS',
+                    'message': f'Invalid or inactive file category IDs: {invalid_ids}. Please use valid active category IDs.'
+                }
+            }), 400
+        user.assigned_file_category_ids = validated_data.file_category_ids
+
     user.save()
 
     # Log activity
@@ -309,5 +350,31 @@ def get_roles():
             {'value': 'superadmin', 'label': 'Super Admin'},
             {'value': 'manager', 'label': 'Manager'},
             {'value': 'clark', 'label': 'Clark'}
+        ]
+    }), 200
+
+
+@users_bp.route('/file-categories', methods=['GET'])
+@jwt_required()
+def get_file_categories():
+    """Get all available file categories"""
+    error = require_admin()
+    if error:
+        return error
+    
+    # Get all active file categories from database
+    all_categories = FileCategory.get_all()
+    active_categories = [
+        cat for cat in all_categories 
+        if hasattr(cat, 'status') and cat.status == 'active'
+    ]
+    
+    return jsonify({
+        'file_categories': [
+            {
+                'value': cat.code,
+                'label': cat.name if hasattr(cat, 'name') and cat.name else cat.code.replace('_', ' ').title()
+            }
+            for cat in active_categories
         ]
     }), 200

@@ -1,5 +1,5 @@
 from app import create_app
-from app.models import User, Application
+from app.models import User, Application, FileCategory
 from app.db import init_firestore
 from datetime import datetime, timedelta
 
@@ -52,12 +52,55 @@ def seed_database():
         
         applications = {}
         for app_data in applications_data:
-            app = Application(**app_data)
-            app.save()
-            applications[app_data['name']] = app
-            print(f"  Created application: {app_data['name']} (ID: {app.id})")
+            # Check if application already exists
+            existing = Application.get_by_name(app_data['name'])
+            if existing:
+                applications[app_data['name']] = existing
+                print(f"  Application already exists: {app_data['name']} (ID: {existing.id})")
+            else:
+                app = Application(**app_data)
+                app.save()
+                applications[app_data['name']] = app
+                print(f"  Created application: {app_data['name']} (ID: {app.id})")
         
-        print(f"Created {len(applications)} applications")
+        print(f"Created/verified {len(applications)} applications")
+
+        # Create File Categories
+        print("Creating file categories...")
+        VALID_CATEGORIES = [
+            "1099",
+            "CHECKS",
+            "CHILD_WELFARE_REPORTS",
+            "LEAVE_DOCUMENTS",
+            "MONTH_END_REPORTS",
+            "PAYROLL_REPORTS_N_DOCUMENTS",
+            "PENDING_FILES",
+            "PERSONNEL_FILES",
+            "TRAVEL_REPORTS",
+            "OTHER"
+        ]
+        
+        file_categories = {}
+        for category_code in VALID_CATEGORIES:
+            # Check if category already exists
+            existing = FileCategory.get_by_code(category_code)
+            if existing:
+                file_categories[category_code] = existing
+                print(f"  File category already exists: {category_code} (ID: {existing.id})")
+            else:
+                # Create category with a formatted name
+                category_name = category_code.replace('_', ' ').title()
+                file_category = FileCategory(
+                    code=category_code,
+                    name=category_name,
+                    description=f"File category for {category_name}",
+                    status='active'
+                )
+                file_category.save()
+                file_categories[category_code] = file_category
+                print(f"  Created file category: {category_code} (ID: {file_category.id})")
+        
+        print(f"Created/verified {len(file_categories)} file categories")
 
         # Create Users
         print("Creating users...")
@@ -118,7 +161,14 @@ def seed_database():
             }
         ]
 
+        created_users = 0
         for user_data in users_data:
+            # Check if user already exists
+            existing = User.get_by_email(user_data['email'])
+            if existing:
+                print(f"  User already exists: {user_data['email']} (ID: {existing.id})")
+                continue  # Skip creating duplicate user
+            
             user = User(
                 email=user_data['email'],
                 role=user_data['role'],
@@ -141,9 +191,10 @@ def seed_database():
             user.assigned_application_ids = assigned_app_ids
 
             user.save()
+            created_users += 1
             print(f"  Created user: {user_data['email']} (ID: {user.id})")
 
-        print(f"Created {len(users_data)} users")
+        print(f"Created/verified {len(users_data)} users ({created_users} new, {len(users_data) - created_users} existing)")
 
         print("\nDatabase seeded successfully!")
         print("\nSample credentials:")

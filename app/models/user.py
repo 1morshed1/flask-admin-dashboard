@@ -20,6 +20,8 @@ class User(BaseModel):
             self._data['created_date'] = datetime.utcnow()
         if 'assigned_application_ids' not in self._data:
             self._data['assigned_application_ids'] = []
+        if 'assigned_file_category_ids' not in self._data:
+            self._data['assigned_file_category_ids'] = []
     
     def set_password(self, password):
         """Hash and set password"""
@@ -61,6 +63,18 @@ class User(BaseModel):
             result['assigned_applications'] = apps
         else:
             result['assigned_applications'] = []
+        
+        # Load assigned file categories if needed
+        if hasattr(self, 'assigned_file_category_ids') and self.assigned_file_category_ids:
+            from app.models.file_category import FileCategory
+            categories = []
+            for category_id in self.assigned_file_category_ids:
+                category = FileCategory.get_by_id(category_id)
+                if category:
+                    categories.append(category.to_dict())
+            result['assigned_file_categories'] = categories
+        else:
+            result['assigned_file_categories'] = []
         
         return result
     
