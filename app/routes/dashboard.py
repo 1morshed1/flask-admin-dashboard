@@ -1,10 +1,21 @@
 from flask import Blueprint, jsonify
 from flask_jwt_extended import jwt_required
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.models import User, Application, ActivityLog, SystemMetric
 from app.utils.monitoring import get_system_health
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api/dashboard')
+
+
+def _normalize_datetime(dt):
+    """Normalize datetime to timezone-aware UTC for comparison"""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        # If naive, assume it's UTC and make it timezone-aware
+        return dt.replace(tzinfo=timezone.utc)
+    # If already timezone-aware, convert to UTC
+    return dt.astimezone(timezone.utc)
 
 
 @dashboard_bp.route('/stats', methods=['GET'])
@@ -30,15 +41,15 @@ def get_stats():
     active_applications = len([app for app in all_apps if hasattr(app, 'status') and app.status == 'active'])
     
     # Recent activity count (last 24 hours)
-    yesterday = datetime.utcnow() - timedelta(days=1)
+    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
     recent_activities = ActivityLog.get_by_date_range(yesterday)
     recent_activity_count = len(recent_activities)
     
     # Recent logins (last 7 days)
-    week_ago = datetime.utcnow() - timedelta(days=7)
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
     recent_logins = len([
         u for u in all_users
-        if hasattr(u, 'last_login') and u.last_login and u.last_login >= week_ago
+        if hasattr(u, 'last_login') and u.last_login and _normalize_datetime(u.last_login) >= _normalize_datetime(week_ago)
     ])
 
     return jsonify({
@@ -83,7 +94,7 @@ def get_activity():
 @jwt_required()
 def get_metrics_history():
     """Get historical system metrics (last 24 hours)"""
-    yesterday = datetime.utcnow() - timedelta(days=1)
+    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
     metrics = SystemMetric.get_by_date_range(yesterday)
 
     return jsonify({
