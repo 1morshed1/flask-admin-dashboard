@@ -17,10 +17,11 @@ class FileCategory(BaseModel):
         if 'last_updated' not in self._data:
             self._data['last_updated'] = datetime.utcnow()
     
-    def to_dict(self):
-        """Convert to dictionary"""
-        # Count users assigned to this category
-        user_count = self.get_user_count()
+    def to_dict(self, user_count=None):
+        """Convert to dictionary with optional pre-calculated user_count for performance"""
+        # Use provided user_count or calculate it if not provided (for backward compatibility)
+        if user_count is None:
+            user_count = self.get_user_count()
         
         return {
             'id': self.id,

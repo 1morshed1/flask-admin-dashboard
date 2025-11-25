@@ -17,10 +17,11 @@ class Application(BaseModel):
         if 'last_updated' not in self._data:
             self._data['last_updated'] = datetime.utcnow()
     
-    def to_dict(self):
-        """Convert to dictionary"""
-        # Count users assigned to this application
-        user_count = self.get_user_count()
+    def to_dict(self, user_count=None):
+        """Convert to dictionary with optional pre-calculated user_count for performance"""
+        # Use provided user_count or calculate it if not provided (for backward compatibility)
+        if user_count is None:
+            user_count = self.get_user_count()
         
         return {
             'id': self.id,
@@ -51,8 +52,9 @@ class Application(BaseModel):
         """Get count of users assigned to this application"""
         from app.db import get_db
         db = get_db()
-        relationships = db.collection('user_applications').where('application_id', '==', self.id).stream()
-        return len(list(relationships))
+        # Query users where assigned_application_ids array contains this application ID
+        users = db.collection('users').where('assigned_application_ids', 'array_contains', self.id).stream()
+        return len(list(users))
     
     def save(self) -> str:
         """Override save to update last_updated"""

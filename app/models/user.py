@@ -39,8 +39,9 @@ class User(BaseModel):
             self.password_hash.encode('utf-8')
         )
     
-    def to_dict(self):
-        """Convert to dictionary"""
+    def to_dict(self, applications_cache=None, file_categories_cache=None, 
+                app_user_counts=None, category_user_counts=None):
+        """Convert to dictionary with optional pre-loaded caches for performance"""
         result = {
             'id': self.id,
             'email': self.email,
@@ -56,10 +57,20 @@ class User(BaseModel):
         if hasattr(self, 'assigned_application_ids') and self.assigned_application_ids:
             from app.models.application import Application
             apps = []
-            for app_id in self.assigned_application_ids:
-                app = Application.get_by_id(app_id)
-                if app:
-                    apps.append(app.to_dict())
+            if applications_cache is not None:
+                # Use pre-loaded cache for O(1) lookup
+                for app_id in self.assigned_application_ids:
+                    app = applications_cache.get(app_id)
+                    if app:
+                        # Get user_count from provided counts if available
+                        app_user_count = app_user_counts.get(app_id) if app_user_counts else None
+                        apps.append(app.to_dict(user_count=app_user_count))
+            else:
+                # Fallback to individual queries (for backward compatibility)
+                for app_id in self.assigned_application_ids:
+                    app = Application.get_by_id(app_id)
+                    if app:
+                        apps.append(app.to_dict())
             result['assigned_applications'] = apps
         else:
             result['assigned_applications'] = []
@@ -68,10 +79,20 @@ class User(BaseModel):
         if hasattr(self, 'assigned_file_category_ids') and self.assigned_file_category_ids:
             from app.models.file_category import FileCategory
             categories = []
-            for category_id in self.assigned_file_category_ids:
-                category = FileCategory.get_by_id(category_id)
-                if category:
-                    categories.append(category.to_dict())
+            if file_categories_cache is not None:
+                # Use pre-loaded cache for O(1) lookup
+                for category_id in self.assigned_file_category_ids:
+                    category = file_categories_cache.get(category_id)
+                    if category:
+                        # Get user_count from provided counts if available
+                        cat_user_count = category_user_counts.get(category_id) if category_user_counts else None
+                        categories.append(category.to_dict(user_count=cat_user_count))
+            else:
+                # Fallback to individual queries (for backward compatibility)
+                for category_id in self.assigned_file_category_ids:
+                    category = FileCategory.get_by_id(category_id)
+                    if category:
+                        categories.append(category.to_dict())
             result['assigned_file_categories'] = categories
         else:
             result['assigned_file_categories'] = []

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from datetime import datetime
-from app.models import User, Application, ActivityLog
+from app.models import User, ActivityLog
 from app.schemas.user_schema import (
     UserCreateSchema,
     UserUpdateSchema,
@@ -56,6 +56,58 @@ def get_users(validated_data: UserQuerySchema):
     # Get all users (Firestore doesn't support complex queries easily)
     all_users = User.get_all()
     
+    # Collect all unique application IDs and file category IDs from all users
+    # Also pre-calculate user counts in a single pass for performance
+    all_app_ids = set()
+    all_category_ids = set()
+    app_user_counts = {}  # app_id -> count
+    category_user_counts = {}  # category_id -> count
+    
+    for user in all_users:
+        # Count applications
+        if hasattr(user, 'assigned_application_ids') and user.assigned_application_ids:
+            all_app_ids.update(user.assigned_application_ids)
+            for app_id in user.assigned_application_ids:
+                app_user_counts[app_id] = app_user_counts.get(app_id, 0) + 1
+        
+        # Count file categories
+        if hasattr(user, 'assigned_file_category_ids') and user.assigned_file_category_ids:
+            all_category_ids.update(user.assigned_file_category_ids)
+            for cat_id in user.assigned_file_category_ids:
+                category_user_counts[cat_id] = category_user_counts.get(cat_id, 0) + 1
+    
+    # Batch load all applications and file categories for performance
+    from app.db import get_db
+    db = get_db()
+    
+    applications_cache = {}
+    if all_app_ids:
+        from app.models.application import Application
+        # Use Firestore batch get for better performance
+        app_refs = [db.collection('applications').document(app_id) for app_id in all_app_ids]
+        if app_refs:
+            docs = db.get_all(app_refs)
+            for doc in docs:
+                if doc.exists:
+                    data = doc.to_dict()
+                    data['id'] = doc.id
+                    app = Application(**data)
+                    applications_cache[app.id] = app
+    
+    file_categories_cache = {}
+    if all_category_ids:
+        from app.models.file_category import FileCategory
+        # Use Firestore batch get for better performance
+        category_refs = [db.collection('file_categories').document(cat_id) for cat_id in all_category_ids]
+        if category_refs:
+            docs = db.get_all(category_refs)
+            for doc in docs:
+                if doc.exists:
+                    data = doc.to_dict()
+                    data['id'] = doc.id
+                    category = FileCategory(**data)
+                    file_categories_cache[category.id] = category
+    
     # Apply filters
     filtered_users = all_users
     
@@ -95,7 +147,14 @@ def get_users(validated_data: UserQuerySchema):
     pagination = _paginate_firestore(filtered_users, validated_data.page, validated_data.per_page)
 
     return jsonify({
-        'users': [user.to_dict() for user in pagination['items']],
+        'users': [
+            user.to_dict(
+                applications_cache=applications_cache,
+                file_categories_cache=file_categories_cache,
+                app_user_counts=app_user_counts,
+                category_user_counts=category_user_counts
+            ) for user in pagination['items']
+        ],
         'pagination': {
             'page': validated_data.page,
             'per_page': validated_data.per_page,
@@ -125,11 +184,28 @@ def create_user(validated_data: UserCreateSchema):
             }
         }), 409
 
-    # Validate file category IDs exist in database
+    # Batch load file categories for validation and reuse for response
+    from app.db import get_db
+    from app.models.application import Application
+    db = get_db()
+    file_categories_dict = {}
+    
     if validated_data.file_category_ids:
+        # Batch load all file categories
+        category_refs = [db.collection('file_categories').document(cat_id) for cat_id in validated_data.file_category_ids]
+        if category_refs:
+            docs = db.get_all(category_refs)
+            for doc in docs:
+                if doc.exists:
+                    data = doc.to_dict()
+                    data['id'] = doc.id
+                    category = FileCategory(**data)
+                    file_categories_dict[category.id] = category
+        
+        # Validate file category IDs
         invalid_ids = []
         for category_id in validated_data.file_category_ids:
-            category = FileCategory.get_by_id(category_id)
+            category = file_categories_dict.get(category_id)
             if not category:
                 invalid_ids.append(category_id)
             elif hasattr(category, 'status') and category.status != 'active':
@@ -172,9 +248,59 @@ def create_user(validated_data: UserCreateSchema):
     )
     activity.save()
 
+    # Batch load applications for response (if needed)
+    applications_cache = {}
+    if validated_data.application_ids:
+        app_refs = [db.collection('applications').document(app_id) for app_id in validated_data.application_ids]
+        if app_refs:
+            docs = db.get_all(app_refs)
+            for doc in docs:
+                if doc.exists:
+                    data = doc.to_dict()
+                    data['id'] = doc.id
+                    app = Application(**data)
+                    applications_cache[app.id] = app
+    
+    # Reuse already loaded file categories for response
+    file_categories_cache = file_categories_dict
+
+    # Calculate user counts efficiently by loading all users once and counting in memory
+    app_user_counts = {}
+    category_user_counts = {}
+    
+    if validated_data.application_ids or validated_data.file_category_ids:
+        # Initialize counts for the applications/categories we care about
+        app_ids_set = set(validated_data.application_ids) if validated_data.application_ids else set()
+        cat_ids_set = set(validated_data.file_category_ids) if validated_data.file_category_ids else set()
+        
+        for app_id in app_ids_set:
+            app_user_counts[app_id] = 0
+        for cat_id in cat_ids_set:
+            category_user_counts[cat_id] = 0
+        
+        # Load all users once (much faster than N+M individual Firestore queries)
+        all_users = User.get_all()
+        
+        # Count in a single pass through all users
+        for u in all_users:
+            if hasattr(u, 'assigned_application_ids') and u.assigned_application_ids:
+                for app_id in u.assigned_application_ids:
+                    if app_id in app_ids_set:
+                        app_user_counts[app_id] += 1
+            
+            if hasattr(u, 'assigned_file_category_ids') and u.assigned_file_category_ids:
+                for cat_id in u.assigned_file_category_ids:
+                    if cat_id in cat_ids_set:
+                        category_user_counts[cat_id] += 1
+
     return jsonify({
         'message': 'User created successfully',
-        'user': user.to_dict()
+        'user': user.to_dict(
+            applications_cache=applications_cache if applications_cache else None,
+            file_categories_cache=file_categories_cache if file_categories_cache else None,
+            app_user_counts=app_user_counts if app_user_counts else None,
+            category_user_counts=category_user_counts if category_user_counts else None
+        )
     }), 201
 
 
