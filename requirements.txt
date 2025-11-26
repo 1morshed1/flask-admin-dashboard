@@ -11,6 +11,9 @@ firebase-admin==6.6.0
 # google-cloud-firestore is included as a dependency of firebase-admin
 # but we specify it explicitly for custom database support
 google-cloud-firestore>=2.19.0
+# Google API Python Client for Firestore Admin API
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
 
 # Validation & Serialization - PYDANTIC
 pydantic==2.5.3
