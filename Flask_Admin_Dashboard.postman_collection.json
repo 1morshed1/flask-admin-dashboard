@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "flask-admin-dashboard-001",
 		"name": "Flask Admin Dashboard",
-		"description": "Complete API collection for Flask Admin Dashboard with authentication, user management, application management, and dashboard endpoints.",
+		"description": "Complete API collection for Flask Admin Dashboard with authentication, user management, application management, file category management, dashboard endpoints, and Firestore index management.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -223,6 +223,12 @@
 									"key": "order",
 									"value": "desc",
 									"disabled": true
+								},
+								{
+									"key": "category",
+									"value": "",
+									"disabled": true,
+									"description": "Filter by file category IDs (comma-separated)"
 								}
 							]
 						},
@@ -257,7 +263,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"email\": \"newuser@example.com\",\n    \"password\": \"Password123!\",\n    \"role\": \"user\",\n    \"status\": \"active\",\n    \"first_name\": \"Jane\",\n    \"last_name\": \"Doe\",\n    \"application_ids\": [1, 2]\n}"
+							"raw": "{\n    \"email\": \"newuser@example.com\",\n    \"password\": \"Password123!\",\n    \"role\": \"user\",\n    \"status\": \"active\",\n    \"first_name\": \"Jane\",\n    \"last_name\": \"Doe\",\n    \"application_ids\": [],\n    \"file_category_ids\": []\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/users",
@@ -294,7 +300,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"first_name\": \"Updated\",\n    \"last_name\": \"Name\",\n    \"role\": \"admin\",\n    \"status\": \"active\",\n    \"application_ids\": [1, 2, 3]\n}"
+							"raw": "{\n    \"first_name\": \"Updated\",\n    \"last_name\": \"Name\",\n    \"role\": \"admin\",\n    \"status\": \"active\",\n    \"application_ids\": [],\n    \"file_category_ids\": []\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/users/{{user_id}}",
@@ -330,6 +336,43 @@
 							"path": ["users", "{{user_id}}"]
 						},
 						"description": "Delete a user. Cannot delete your own account. Requires admin/superadmin role."
+					},
+					"response": []
+				},
+				{
+					"name": "Get File Categories (for Users)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/file-categories",
+							"host": ["{{base_url}}"],
+							"path": ["users", "file-categories"]
+						},
+						"description": "Get all available active file categories for user assignment. Requires admin/superadmin role."
+					},
+					"response": []
+				},
+				{
+					"name": "Initialize Superuser",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"superadmin@example.com\",\n    \"password\": \"SuperAdmin123!\",\n    \"first_name\": \"Super\",\n    \"last_name\": \"Admin\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/init",
+							"host": ["{{base_url}}"],
+							"path": ["users", "init"]
+						},
+						"description": "Initialize superuser. Only works if no users exist in the database. No authentication required."
 					},
 					"response": []
 				}
@@ -476,6 +519,145 @@
 			"description": "Application management endpoints for CRUD operations."
 		},
 		{
+			"name": "File Categories",
+			"item": [
+				{
+					"name": "Get All File Categories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/file-categories?page=1&per_page=20&status=active",
+							"host": ["{{base_url}}"],
+							"path": ["file-categories"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "per_page",
+									"value": "20"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "active",
+									"disabled": true
+								},
+								{
+									"key": "sort",
+									"value": "code",
+									"disabled": true
+								},
+								{
+									"key": "order",
+									"value": "asc",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Get all file categories with pagination and filtering."
+					},
+					"response": []
+				},
+				{
+					"name": "Create File Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set(\"last_created_category_id\", response.file_category.id);",
+									"    console.log(\"File category created:\", response.file_category.code);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"code\": \"1099\",\n    \"name\": \"1099 Forms\",\n    \"description\": \"Tax form category\",\n    \"status\": \"active\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/file-categories",
+							"host": ["{{base_url}}"],
+							"path": ["file-categories"]
+						},
+						"description": "Create a new file category. Code will be normalized to uppercase. Requires admin/superadmin role."
+					},
+					"response": []
+				},
+				{
+					"name": "Get File Category by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/file-categories/{{category_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["file-categories", "{{category_id}}"]
+						},
+						"description": "Get a specific file category by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Update File Category",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Category Name\",\n    \"description\": \"Updated description\",\n    \"status\": \"inactive\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/file-categories/{{category_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["file-categories", "{{category_id}}"]
+						},
+						"description": "Update a file category. All fields are optional. Code will be normalized to uppercase if provided. Requires admin/superadmin role."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete File Category",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/file-categories/{{category_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["file-categories", "{{category_id}}"]
+						},
+						"description": "Delete a file category. Cannot delete if assigned to any users. Requires admin/superadmin role."
+					},
+					"response": []
+				}
+			],
+			"description": "File category management endpoints for CRUD operations."
+		},
+		{
 			"name": "Dashboard",
 			"item": [
 				{
@@ -568,6 +750,73 @@
 				}
 			],
 			"description": "Dashboard endpoints for statistics, health monitoring, and activity logs."
+		},
+		{
+			"name": "Firestore Indexes",
+			"item": [
+				{
+					"name": "Get Indexes Config",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/firestore/indexes",
+							"host": ["{{base_url}}"],
+							"path": ["firestore", "indexes"]
+						},
+						"description": "Get the current indexes configuration from firestore.indexes.json. Requires superadmin role."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Indexes",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/firestore/indexes/create",
+							"host": ["{{base_url}}"],
+							"path": ["firestore", "indexes", "create"]
+						},
+						"description": "Create Firestore composite indexes programmatically using the Admin API. Reads from firestore.indexes.json. Requires superadmin role."
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Indexes",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/firestore/indexes/validate",
+							"host": ["{{base_url}}"],
+							"path": ["firestore", "indexes", "validate"]
+						},
+						"description": "Validate the indexes configuration file. Requires superadmin role."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Indexes Info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/firestore/indexes/info",
+							"host": ["{{base_url}}"],
+							"path": ["firestore", "indexes", "info"]
+						},
+						"description": "Get information about the Firestore project and database. Requires superadmin role."
+					},
+					"response": []
+				}
+			],
+			"description": "Firestore index management endpoints. Requires superadmin role."
 		}
 	],
 	"event": [
@@ -628,6 +877,16 @@
 		},
 		{
 			"key": "last_created_app_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "category_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "last_created_category_id",
 			"value": "",
 			"type": "string"
 		}
