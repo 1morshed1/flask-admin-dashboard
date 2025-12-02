@@ -411,16 +411,49 @@ def fetch_categories_from_applications(validated_data: FetchCategoriesFromApplic
                 'error': f'Failed to fetch categories: {str(e)}'
             })
     
-    # Convert to sorted list
+    # Convert to sorted list of category codes
     unique_categories_list = sorted(unique_categories)
     
-    # If no categories were fetched, return VALID_CATEGORIES as fallback
+    # If no categories were fetched, use VALID_CATEGORIES as fallback
     if not unique_categories_list:
         unique_categories_list = sorted([cat.upper() for cat in VALID_CATEGORIES])
     
+    # Fetch full category objects from database by code
+    file_categories_list = []
+    for category_code in unique_categories_list:
+        # Try to find category in database by code
+        category = FileCategory.get_by_code(category_code)
+        if category:
+            # Use to_dict() for proper FileCategory objects
+            file_categories_list.append(category.to_dict())
+        else:
+            # If category doesn't exist in DB, create a minimal representation
+            # This handles cases where backend returns codes not yet in our DB
+            file_categories_list.append({
+                'id': None,
+                'code': category_code,
+                'name': category_code.replace('_', ' ').title(),
+                'description': None,
+                'status': 'active',
+                'created_date': None,
+                'last_updated': None,
+                'user_count': 0
+            })
+    
+    # Sort by code for consistent output
+    file_categories_list.sort(key=lambda x: x.get('code', '').upper())
+    
+    # Return in same format as get_file_categories
     response_data = {
-        'categories': unique_categories_list,
-        'total': len(unique_categories_list),
+        'file_categories': file_categories_list,
+        'pagination': {
+            'page': 1,
+            'per_page': len(file_categories_list),
+            'total': len(file_categories_list),
+            'pages': 1,
+            'has_next': False,
+            'has_prev': False
+        },
         'applications_processed': len(application_urls) - len(errors),
         'applications_failed': len(errors)
     }
