@@ -1,11 +1,15 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from datetime import datetime
+from urllib.parse import urlparse, urlunparse
+import requests
+from typing import List, Set
 from app.models import FileCategory, ActivityLog
 from app.schemas.file_category_schema import (
     FileCategoryCreateSchema,
     FileCategoryUpdateSchema,
-    FileCategoryQuerySchema
+    FileCategoryQuerySchema,
+    FetchCategoriesFromApplicationsSchema
 )
 from app.utils.validation import validate_json_body, validate_query_params
 
@@ -262,4 +266,149 @@ def delete_file_category(category_id):
     return jsonify({
         'message': 'File category deleted successfully'
     }), 200
+
+
+def _convert_to_backend_url(application_url: str) -> str:
+    """
+    Convert application URL to backend URL format.
+    Example: https://doc-digitization.shothik.ai/r2/login -> https://doc-digitization.shothik.ai/r14-backend
+    """
+    try:
+        parsed = urlparse(application_url)
+        # Reconstruct URL with base domain and /r14-backend path
+        backend_url = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            '/r14-backend',
+            '',  # params
+            '',  # query
+            ''   # fragment
+        ))
+        return backend_url
+    except Exception as e:
+        raise ValueError(f"Invalid URL format: {application_url}. Error: {str(e)}")
+
+
+def _fetch_categories_from_backend(backend_url: str, auth_token: str = None, timeout: int = 10) -> List[str]:
+    """
+    Fetch categories from a backend URL.
+    Uses the endpoint: /backend/api/v2/system/categories
+    Returns a list of category code strings (e.g., ["1099", "OTHER", ...])
+    
+    Args:
+        backend_url: The base backend URL
+        auth_token: JWT token for authentication (optional)
+        timeout: Request timeout in seconds
+    """
+    try:
+        categories_url = f"{backend_url.rstrip('/')}/backend/api/v2/system/categories"
+        print(f"DEBUG [file_categories.py]: categories_url = {categories_url}")
+        
+        # Prepare headers
+        headers = {
+            'Content-Type': 'application/json',
+        }
+        
+        # Add Authorization header if token is provided
+        if auth_token:
+            headers['Authorization'] = f'Bearer {auth_token}'
+        
+        # Make request to fetch categories
+        response = requests.get(
+            categories_url,
+            timeout=timeout,
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Backend returns a simple array of category code strings
+            # e.g., ["1099", "OTHER", "PAYROLL_REPORTS_N_DOCUMENTS", ...]
+            if isinstance(data, list):
+                # Filter to ensure all items are strings
+                return [str(cat).strip() for cat in data if cat and str(cat).strip()]
+            else:
+                print(f"DEBUG [file_categories.py]: Unexpected response format: {type(data)}")
+                return []
+        else:
+            # Log error details for debugging
+            print(f"DEBUG [file_categories.py]: Request failed with status {response.status_code}")
+            try:
+                error_data = response.json()
+                print(f"DEBUG [file_categories.py]: Error response: {error_data}")
+            except (ValueError, requests.exceptions.JSONDecodeError):
+                print(f"DEBUG [file_categories.py]: Error response text: {response.text[:200]}")
+            return []
+    except requests.exceptions.RequestException as e:
+        # Log error but don't fail the entire request
+        print(f"DEBUG [file_categories.py]: Request exception: {str(e)}")
+        return []
+    except Exception as e:
+        # Log error but don't fail the entire request
+        print(f"DEBUG [file_categories.py]: Unexpected error: {str(e)}")
+        return []
+
+
+@file_categories_bp.route('/from-applications', methods=['POST'])
+@jwt_required()
+@validate_json_body(FetchCategoriesFromApplicationsSchema)
+def fetch_categories_from_applications(validated_data: FetchCategoriesFromApplicationsSchema):
+    """
+    Fetch unique categories from multiple applications.
+    
+    Accepts a list of application URLs, converts them to backend URLs,
+    fetches categories from each, and returns unique categories.
+    """
+    application_urls = validated_data.application_urls
+    errors = []
+    
+    # Extract JWT token from Authorization header
+    auth_header = request.headers.get('Authorization', '')
+    auth_token = None
+    if auth_header.startswith('Bearer '):
+        auth_token = auth_header.split(' ', 1)[1]
+    
+    # Track unique categories using a set (case-insensitive)
+    unique_categories: Set[str] = set()
+    
+    for app_url in application_urls:
+        try:
+            # Convert application URL to backend URL
+            backend_url = _convert_to_backend_url(app_url)
+            
+            print(f"DEBUG [file_categories.py]: backend_url = {backend_url}")
+            # Fetch categories from backend (returns list of strings)
+            categories = _fetch_categories_from_backend(backend_url, auth_token=auth_token)
+            
+            # Add to unique categories set (case-insensitive deduplication)
+            for category_code in categories:
+                if category_code:
+                    # Normalize to uppercase for case-insensitive uniqueness check
+                    unique_categories.add(category_code.upper())
+            
+        except ValueError as e:
+            errors.append({
+                'url': app_url,
+                'error': str(e)
+            })
+        except Exception as e:
+            errors.append({
+                'url': app_url,
+                'error': f'Failed to fetch categories: {str(e)}'
+            })
+    
+    # Convert to sorted list
+    unique_categories_list = sorted(unique_categories)
+    
+    response_data = {
+        'categories': unique_categories_list,
+        'total': len(unique_categories_list),
+        'applications_processed': len(application_urls) - len(errors),
+        'applications_failed': len(errors)
+    }
+    
+    if errors:
+        response_data['errors'] = errors
+    
+    return jsonify(response_data), 200
 

@@ -55,3 +55,7 @@ class FileCategoryResponseSchema(BaseModel):
         'from_attributes': True
     }
 
+
+class FetchCategoriesFromApplicationsSchema(BaseModel):
+    """Schema for fetching categories from multiple applications"""
+    application_urls: list[str] = Field(..., min_length=1, description="List of application URLs to fetch categories from")

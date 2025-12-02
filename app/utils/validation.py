@@ -64,7 +64,8 @@ def validate_request(schema: Type[BaseModel], source: str = 'json'):
                 return jsonify({
                     'error': {
                         'code': 'INTERNAL_ERROR',
-                        'message': error_message
+                        'message': 'An unexpected error occurred while processing your request. Please try again later.',
+                        'details': error_message
                     }
                 }), 500
         return decorated_function
