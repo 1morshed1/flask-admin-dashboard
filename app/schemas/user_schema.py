@@ -9,6 +9,20 @@ class LoginSchema(BaseModel):
     password: str = Field(..., min_length=6)
 
 
+class PasswordChangeSchema(BaseModel):
+    """Password change request schema"""
+    current_password: str = Field(..., min_length=1, description="Current password")
+    new_password: str = Field(..., min_length=6, description="New password")
+    
+    @field_validator('new_password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        """Validate password strength"""
+        if len(v) < 6:
+            raise ValueError('New password must be at least 6 characters')
+        return v
+
+
 class InitSuperuserSchema(BaseModel):
     """Superuser initialization schema (same as UserCreateSchema but without application_ids and file_category_ids)"""
     email: EmailStr

@@ -14,7 +14,7 @@ import traceback
 import logging
 from datetime import datetime
 from app.models import User, ActivityLog
-from app.schemas.user_schema import LoginSchema
+from app.schemas.user_schema import LoginSchema, PasswordChangeSchema
 from app.utils.validation import validate_json_body
 from app.utils.saml_utils import prepare_flask_request, load_saml_settings_from_json, get_saml_settings
 
@@ -582,6 +582,69 @@ def get_current_user():
         }), 404
 
     return jsonify(user.to_dict()), 200
+
+
+@auth_bp.route('/change-password', methods=['POST'])
+@jwt_required()
+@validate_json_body(PasswordChangeSchema)
+def change_password(validated_data: PasswordChangeSchema):
+    """Change user password endpoint - requires current password verification"""
+    user_id = get_jwt_identity()
+    # JWT identity is string
+    user = User.get_by_id(user_id)
+    
+    if not user:
+        return jsonify({
+            'error': {
+                'code': 'USER_NOT_FOUND',
+                'message': 'User not found'
+            }
+        }), 404
+    
+    # Check if user is active
+    if user.status != 'active':
+        return jsonify({
+            'error': {
+                'code': 'ACCOUNT_INACTIVE',
+                'message': 'Your account has been deactivated'
+            }
+        }), 403
+    
+    # Verify current password
+    if not user.check_password(validated_data.current_password):
+        return jsonify({
+            'error': {
+                'code': 'INVALID_CURRENT_PASSWORD',
+                'message': 'Current password is incorrect'
+            }
+        }), 401
+    
+    # Check if new password is different from current password
+    if user.check_password(validated_data.new_password):
+        return jsonify({
+            'error': {
+                'code': 'PASSWORD_SAME',
+                'message': 'New password must be different from current password'
+            }
+        }), 400
+    
+    # Set new password
+    user.set_password(validated_data.new_password)
+    user.save()
+    
+    # Log activity
+    activity = ActivityLog(
+        event_type='password_change',
+        user_id=user.id,
+        description=f'User {user.email} changed password',
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent')
+    )
+    activity.save()
+    
+    return jsonify({
+        'message': 'Password changed successfully'
+    }), 200
 
 
 @auth_bp.route('/verify', methods=['POST', 'GET'])
